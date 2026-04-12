@@ -1,0 +1,7 @@
+{
+  "type": "HEALTH_CHECK",
+  "from": "lighthouse-keeper",
+  "timestamp": "2026-04-12T17:18:17.550079+00:00",
+  "message": "Are you ok? Please respond by updating STATUS.json or pushing a commit.",
+  "respond_within": 600
+}
