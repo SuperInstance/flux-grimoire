@@ -1,12 +1,14 @@
 pub mod curriculum;
-pub mod grimoire;
-pub mod spell;
+pub mod pattern;
+pub mod spellbook;
+pub mod catalog;
 
 #[cfg(test)]
 mod tests {
     use crate::curriculum::{Curriculum, Level};
-    use crate::grimoire::Grimoire;
-    use crate::spell::{PatternType, Spell};
+    use crate::pattern::Pattern;
+    use crate::spellbook::SpellBook;
+    use crate::catalog::PatternCatalog;
 
     // --- Spell tests ---
     #[test]
@@ -212,143 +214,69 @@ mod tests {
         assert_eq!(p.mastered_levels, 2); // s1 used=1.0, s2 unused=1.0 both pass
     }
 
-    // --- Additional edge-case tests ---
-
+    // --- Pattern + SpellBook integration tests ---
     #[test]
-    fn pattern_type_display() {
-        assert_eq!(format!("{}", PatternType::Behavioral), "Behavioral");
-        assert_eq!(format!("{}", PatternType::Cognitive), "Cognitive");
-        assert_eq!(format!("{}", PatternType::Social), "Social");
-        assert_eq!(format!("{}", PatternType::Debugging), "Debugging");
-        assert_eq!(format!("{}", PatternType::Optimization), "Optimization");
+    fn spellbook_compose_chain() {
+        let mut sb = SpellBook::new("Math", "superz");
+        sb.add_pattern(Pattern::new("load", "Load", &[0x10]));
+        sb.add_pattern(Pattern::new("add", "Add", &[0x20]).with_dependencies(&["load"]));
+        sb.add_pattern(Pattern::new("store", "Store", &[0x30]).with_dependencies(&["add"]));
+        // Compose all three with dependency order
+        let result = sb.compose(&["store", "add", "load"]);
+        assert!(result.is_ok());
+        let bc = result.unwrap();
+        assert_eq!(bc, vec![0x10, 0x20, 0x30]); // load -> add -> store
     }
 
     #[test]
-    fn empty_grimoire_operations() {
-        let mut g = Grimoire::new();
-        assert!(g.find("nothing").is_none());
-        assert!(g.cast("none").is_empty());
-        assert!(g.search_trigger("x").is_empty());
-        assert!(g.by_type(&PatternType::Behavioral).is_empty());
-        assert!(g.by_confidence(0.0).is_empty());
-        assert!(g.shared().is_empty());
-        assert!(!g.publish("nope"));
-        assert!(!g.record_outcome("nope", true));
-        assert_eq!(g.import(vec![]), 0);
-        let stats = g.statistics();
-        assert_eq!(stats.total, 0);
-        assert_eq!(stats.shared, 0);
-        assert!(stats.by_type.is_empty());
-        assert_eq!(stats.avg_confidence, 0.0);
+    fn catalog_and_spellbook_integration() {
+        let mut cat = PatternCatalog::new();
+        let p1 = Pattern::new("op_add", "Add", &[0x01, 0x02]).with_category("arithmetic").with_tags(&["math"]);
+        let p2 = Pattern::new("op_mul", "Multiply", &[0x03, 0x04]).with_category("arithmetic").with_tags(&["math", "fast"]);
+        cat.register(p1.clone());
+        cat.register(p2.clone());
+
+        let mut sb = SpellBook::new("MathOps", "superz");
+        for id in cat.search("arithmetic") {
+            if let Some(pat) = cat.get(&id.pattern_id) {
+                sb.add_pattern(pat.clone());
+            }
+        }
+        assert_eq!(sb.len(), 2);
     }
 
     #[test]
-    fn grimoire_prune_nothing_removed() {
-        let mut g = make_grimoire();
-        let removed = g.prune(0.0, 100);
-        assert!(removed.is_empty());
-        assert_eq!(g.find("s1").unwrap().id, "s1");
+    fn version_tracking_across_updates() {
+        let mut sb = SpellBook::new("Versioned", "superz");
+        sb.add_pattern(Pattern::new("p1", "Pattern", &[0x01, 0x02]));
+        {
+            let p = sb.get_pattern_mut("p1").unwrap();
+            assert_eq!(p.version, 1);
+            p.bump_version("first update");
+        }
+        {
+            let p = sb.get_pattern_mut("p1").unwrap();
+            assert_eq!(p.version, 2);
+            p.update_bytecode(&[0xFF, 0xEE]);
+        }
+        assert_eq!(sb.get_pattern("p1").unwrap().version, 3);
     }
 
     #[test]
-    fn grimoire_import_empty_vec() {
-        let mut g = make_grimoire();
-        assert_eq!(g.import(vec![]), 0);
-    }
+    fn export_import_preserves_data() {
+        let mut sb = SpellBook::new("ExportTest", "superz")
+            .with_description("Test export/import");
+        let mut p = Pattern::new("p1", "Complex", &[0x01, 0x02])
+            .with_category("math")
+            .with_tags(&["basic", "essential"]);
+        p.bump_version("initial release");
+        sb.add_pattern(p);
 
-    #[test]
-    fn grimoire_cast_multiple_same_trigger() {
-        let mut g = Grimoire::new();
-        g.learn(
-            "a",
-            "Spell A",
-            PatternType::Behavioral,
-            "fire",
-            "run",
-            "always",
-            "me",
-        );
-        g.learn(
-            "b",
-            "Spell B",
-            PatternType::Cognitive,
-            "fire",
-            "think",
-            "always",
-            "me",
-        );
-        let results = g.cast("fire");
-        assert_eq!(results.len(), 2);
-    }
-
-    #[test]
-    fn spell_all_fields() {
-        let s = Spell::new(
-            "id",
-            "Name",
-            PatternType::Social,
-            "trig",
-            "act",
-            "ctx",
-            "auth",
-        );
-        assert_eq!(s.id, "id");
-        assert_eq!(s.name, "Name");
-        assert_eq!(s.pattern_type, PatternType::Social);
-        assert_eq!(s.trigger, "trig");
-        assert_eq!(s.action, "act");
-        assert_eq!(s.context, "ctx");
-        assert_eq!(s.author, "auth");
-        assert_eq!(s.uses, 0);
-        assert_eq!(s.successes, 0);
-        assert_eq!(s.failures, 0);
-        assert!(!s.shared);
-    }
-
-    #[test]
-    fn curriculum_empty_levels() {
-        let c = Curriculum::new(vec![]);
-        let g = Grimoire::new();
-        let p = c.progress(&g);
-        assert_eq!(p.mastered_levels, 0);
-        assert_eq!(p.total_levels, 0);
-        assert!(p.details.is_empty());
-    }
-
-    #[test]
-    fn curriculum_level_missing_spell() {
-        let c = Curriculum::new(vec![Level {
-            name: "L1".into(),
-            spell_ids: vec!["nonexistent".into()],
-            min_confidence: 0.5,
-        }]);
-        let g = Grimoire::new();
-        let p = c.progress(&g);
-        assert_eq!(p.mastered_levels, 0);
-        assert!(!p.details[0]);
-    }
-
-    #[test]
-    fn grimoire_search_trigger_no_match() {
-        let g = make_grimoire();
-        assert!(g.search_trigger("zzzzz").is_empty());
-    }
-
-    #[test]
-    fn grimoire_publish_twice() {
-        let mut g = make_grimoire();
-        assert!(g.publish("s1"));
-        assert!(g.publish("s1")); // second publish should still succeed
-        assert_eq!(g.shared().len(), 1);
-    }
-
-    #[test]
-    fn grimoire_record_outcome_failure() {
-        let mut g = make_grimoire();
-        g.record_outcome("s1", false);
-        let s = g.find("s1").unwrap();
-        assert_eq!(s.uses, 1);
-        assert_eq!(s.successes, 0);
-        assert_eq!(s.failures, 1);
+        let exported = sb.export();
+        let imported = SpellBook::from_export(&exported);
+        assert_eq!(imported.name, "ExportTest");
+        assert_eq!(imported.description, "Test export/import");
+        assert_eq!(imported.get_pattern("p1").unwrap().version, 2);
+        assert_eq!(imported.get_pattern("p1").unwrap().tags, vec!["basic", "essential"]);
     }
 }
