@@ -26,20 +26,30 @@ impl Curriculum {
 
     pub fn progress(&self, grimoire: &Grimoire) -> Progress {
         let total = self.levels.len();
-        let details: Vec<bool> = self.levels.iter().map(|level| {
-            let mut count = 0u32;
-            let mut total_conf = 0.0;
-            for id in &level.spell_ids {
-                if let Some(spell) = grimoire.find(id) {
-                    count += 1;
-                    total_conf += spell.confidence();
+        let details: Vec<bool> = self
+            .levels
+            .iter()
+            .map(|level| {
+                let mut count = 0u32;
+                let mut total_conf = 0.0;
+                for id in &level.spell_ids {
+                    if let Some(spell) = grimoire.find(id) {
+                        count += 1;
+                        total_conf += spell.confidence();
+                    }
                 }
-            }
-            if count == 0 { return false; }
-            let avg = total_conf / count as f64;
-            avg >= level.min_confidence
-        }).collect();
+                if count == 0 {
+                    return false;
+                }
+                let avg = total_conf / count as f64;
+                avg >= level.min_confidence
+            })
+            .collect();
         let mastered = details.iter().filter(|&&x| x).count();
-        Progress { mastered_levels: mastered, total_levels: total, details }
+        Progress {
+            mastered_levels: mastered,
+            total_levels: total,
+            details,
+        }
     }
 }

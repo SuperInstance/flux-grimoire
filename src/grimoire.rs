@@ -27,14 +27,26 @@ impl Grimoire {
         }
     }
 
-    pub fn learn(&mut self, id: &str, name: &str, pattern_type: PatternType, trigger: &str, action: &str, context: &str, author: &str) -> &Spell {
+    pub fn learn(
+        &mut self,
+        id: &str,
+        name: &str,
+        pattern_type: PatternType,
+        trigger: &str,
+        action: &str,
+        context: &str,
+        author: &str,
+    ) -> &Spell {
         let spell = Spell::new(id, name, pattern_type, trigger, action, context, author);
         self.spells.push(spell);
         self.spells.last().unwrap()
     }
 
     pub fn cast(&self, trigger: &str) -> Vec<&Spell> {
-        self.spells.iter().filter(|s| s.trigger == trigger).collect()
+        self.spells
+            .iter()
+            .filter(|s| s.trigger == trigger)
+            .collect()
     }
 
     pub fn record_outcome(&mut self, id: &str, success: bool) -> bool {
@@ -51,19 +63,31 @@ impl Grimoire {
     }
 
     pub fn search_trigger(&self, query: &str) -> Vec<&Spell> {
-        self.spells.iter().filter(|s| s.trigger.contains(query)).collect()
+        self.spells
+            .iter()
+            .filter(|s| s.trigger.contains(query))
+            .collect()
     }
 
     pub fn by_type(&self, pattern_type: &PatternType) -> Vec<&Spell> {
-        self.spells.iter().filter(|s| s.pattern_type == *pattern_type).collect()
+        self.spells
+            .iter()
+            .filter(|s| s.pattern_type == *pattern_type)
+            .collect()
     }
 
     pub fn by_confidence(&self, min: f64) -> Vec<&Spell> {
-        self.spells.iter().filter(|s| s.confidence() >= min).collect()
+        self.spells
+            .iter()
+            .filter(|s| s.confidence() >= min)
+            .collect()
     }
 
     pub fn prune(&mut self, min_rate: f64, min_uses: u32) -> Vec<Spell> {
-        let (keep, remove): (Vec<_>, Vec<_>) = self.spells.drain(..).partition(|s| !s.should_forget(min_rate, min_uses));
+        let (keep, remove): (Vec<_>, Vec<_>) = self
+            .spells
+            .drain(..)
+            .partition(|s| !s.should_forget(min_rate, min_uses));
         self.spells = keep;
         remove
     }
@@ -96,13 +120,22 @@ impl Grimoire {
         let shared = self.spells.iter().filter(|s| s.shared).count();
         let mut type_counts = std::collections::HashMap::new();
         for s in &self.spells {
-            *type_counts.entry(s.pattern_type.to_string()).or_insert(0usize) += 1;
+            *type_counts
+                .entry(s.pattern_type.to_string())
+                .or_insert(0usize) += 1;
         }
         let mut by_type: Vec<_> = type_counts.into_iter().collect();
         by_type.sort_by(|a, b| a.0.cmp(&b.0));
         let avg_confidence = if total > 0 {
             self.spells.iter().map(|s| s.confidence()).sum::<f64>() / total as f64
-        } else { 0.0 };
-        GrimoireStats { total, shared, by_type, avg_confidence }
+        } else {
+            0.0
+        };
+        GrimoireStats {
+            total,
+            shared,
+            by_type,
+            avg_confidence,
+        }
     }
 }

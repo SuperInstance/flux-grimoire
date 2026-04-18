@@ -31,7 +31,15 @@ pub struct Spell {
 }
 
 impl Spell {
-    pub fn new(id: &str, name: &str, pattern_type: PatternType, trigger: &str, action: &str, context: &str, author: &str) -> Self {
+    pub fn new(
+        id: &str,
+        name: &str,
+        pattern_type: PatternType,
+        trigger: &str,
+        action: &str,
+        context: &str,
+        author: &str,
+    ) -> Self {
         Self {
             id: id.to_string(),
             name: name.to_string(),
@@ -48,7 +56,9 @@ impl Spell {
     }
 
     pub fn success_rate(&self) -> f64 {
-        if self.uses == 0 { return 1.0; }
+        if self.uses == 0 {
+            return 1.0;
+        }
         self.successes as f64 / self.uses as f64
     }
 
@@ -58,7 +68,11 @@ impl Spell {
 
     pub fn record_use(&mut self, success: bool) {
         self.uses += 1;
-        if success { self.successes += 1; } else { self.failures += 1; }
+        if success {
+            self.successes += 1;
+        } else {
+            self.failures += 1;
+        }
     }
 
     pub fn should_forget(&self, min_rate: f64, min_uses: u32) -> bool {
